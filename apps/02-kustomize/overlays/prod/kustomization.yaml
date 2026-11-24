@@ -11,7 +11,7 @@ resources:
 
 replicas:
   - name: kustomize-app
-    count: 3
+    count: 1
 
 configMapGenerator:
   - name: kustomize-app-config
