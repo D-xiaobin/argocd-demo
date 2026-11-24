@@ -1,0 +1,23 @@
+# 功能点：Application 通过 helm.values / helm.parameters 覆盖这些默认值
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: "1.27-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+env:
+  APP_ENV: helm-default
+  LOG_LEVEL: info
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

@@ -1,0 +1,10 @@
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 本地生成的 cluster secret（含凭证，不要提交）
+cluster-*.yaml
+!config/cluster-secret-example.yaml

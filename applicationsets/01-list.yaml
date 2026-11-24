@@ -1,0 +1,47 @@
+# 功能点：List 生成器 —— 最直观的一种，手写一组参数
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: as-list
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+            namespace: demo-as-dev
+            replicas: "1"
+          - env: staging
+            namespace: demo-as-staging
+            replicas: "2"
+  template:
+    metadata:
+      name: 'list-{{.env}}'
+      labels:
+        demo: applicationset
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        targetRevision: HEAD
+        path: apps/01-basic-yaml
+        kustomize:
+          patches:
+            - target:
+                kind: Deployment
+                name: basic-app
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: {{.replicas}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

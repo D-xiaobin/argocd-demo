@@ -1,0 +1,16 @@
+# 功能点：多源 Application —— Chart 来自 Helm 仓库，values 来自本 Git 仓库
+# Application 里通过 $values 引用这个文件
+replicaCount: 2
+
+logLevel: info
+
+ui:
+  message: "values 来自 Git 仓库，而不是 Helm Chart"
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

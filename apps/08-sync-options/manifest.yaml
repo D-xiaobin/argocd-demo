@@ -1,0 +1,72 @@
+# 功能点：资源级 sync-options
+#   Prune=false  —— 从 Git 删除时，集群里保留（做灰度下线/数据保护）
+#   Delete=false —— 删除 Application 时不删除该资源
+#   Replace=true —— 用 replace 而不是 patch（用于超大 CRD、immutable 字段）
+# 配套：Application 级 syncOptions 在 argocd/apps/advanced.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-options
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keep-on-prune
+  namespace: demo-options
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+data:
+  NOTE: "从 Git 删掉这个文件，集群里的 ConfigMap 仍然存在"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keep-on-delete
+  namespace: demo-options
+  annotations:
+    argocd.argoproj.io/sync-options: Delete=false
+type: Opaque
+stringData:
+  NOTE: "删除 Application 时这个 Secret 不会被删"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: options-app
+  namespace: demo-options
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: options-app
+  template:
+    metadata:
+      labels:
+        app: options-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: options-app
+  namespace: demo-options
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  selector:
+    app: options-app
+  ports:
+    - port: 80
+      targetPort: 80

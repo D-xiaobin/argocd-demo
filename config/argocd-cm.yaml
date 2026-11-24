@@ -1,0 +1,47 @@
+# 功能点：argocd-cm 的三类高级配置
+#   ① 自定义健康检查（Lua）② 比对选项 ③ 调快轮询间隔
+# 应用方式（不要用 replace，会丢掉其他 key）：
+#   kubectl -n argocd apply -f config/argocd-cm.yaml
+#   kubectl -n argocd rollout restart deploy/argocd-server statefulset/argocd-application-controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+data:
+  # 把轮询从默认 3 分钟调成 60 秒，方便做实验（生产别这么干，会给 Git 和 API Server 压力）
+  timeout.reconciliation: 60s
+
+  # 自定义健康检查：给 Deployment 加一个「慢滚动」演示
+  # 用法：kubectl -n demo-basic annotate deploy/basic-app demo.argocd/slow-rollout=true
+  resource.customizations.health.apps_Deployment: |
+    hs = {}
+    if obj.status == nil then
+      hs.status = "Progressing"
+      hs.message = "等待状态上报"
+      return hs
+    end
+    if obj.metadata.annotations ~= nil and obj.metadata.annotations["demo.argocd/slow-rollout"] == "true" then
+      hs.status = "Progressing"
+      hs.message = "自定义健康检查：被标记为滚动中"
+      return hs
+    end
+    local desired = obj.spec.replicas or 1
+    local available = obj.status.availableReplicas or 0
+    if available >= desired then
+      hs.status = "Healthy"
+      hs.message = "所有副本就绪"
+    else
+      hs.status = "Progressing"
+      hs.message = string.format("就绪 %d/%d", available, desired)
+    end
+    return hs
+
+  # 忽略聚合角色（避免 Argo CD 把系统自动生成的 role 判成差异）
+  resource.compareoptions: |
+    ignoreAggregatedRoles: true
+
+  # 允许 Kustomize 读取上级目录（多源/多目录结构常用）
+  kustomize.buildOptions: "--load-restrictor LoadRestrictionsNone"

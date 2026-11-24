@@ -1,0 +1,48 @@
+# 功能点：同步失败 → 重试 → Degraded → SyncFail hook
+# 这个 Job 故意退出码 1。Application 配了 retry(limit: 2)，会看到两次重试后进入 Degraded。
+# 验证：
+#   argocd app get fail-app            # 看 operationState.phase = Failed
+#   kubectl -n demo-fail get jobs      # 看到 syncfail-alert 被触发
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-fail
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: will-fail
+  namespace: demo-fail
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: fail
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "这一步故意失败，用来演示重试与 Degraded 状态"
+              exit 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fail-syncfail-hook
+  namespace: demo-fail
+  annotations:
+    argocd.argoproj.io/hook: SyncFail
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: alert
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo "[SyncFail] fail-app 同步失败，触发告警流程"

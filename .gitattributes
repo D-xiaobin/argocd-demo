@@ -1,0 +1,6 @@
+# 仓库内统一 LF，避免 Windows 编辑器把脚本改成 CRLF
+* text=auto eol=lf
+*.sh   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf

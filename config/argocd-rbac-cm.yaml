@@ -1,0 +1,36 @@
+# 功能点：RBAC —— 默认只读 + 三个角色 + 组映射
+# 应用：kubectl -n argocd apply -f config/argocd-rbac-cm.yaml
+# 验证：
+#   argocd account can-i sync applications team-a/basic-yaml
+#   argocd account can-i delete applications team-a/basic-yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+data:
+  # 未登录/未匹配策略的用户只能读
+  policy.default: role:readonly
+
+  # 3.x 里查看日志需要显式授予 logs, get
+  policy.csv: |
+    # CI 机器人：只能同步 team-a 的应用，不能删
+    p, role:ci, applications, get, team-a/*, allow
+    p, role:ci, applications, sync, team-a/*, allow
+    p, role:ci, applications, update, team-a/*, allow
+    p, role:ci, logs, get, team-a/*, allow
+    g, ci-bot, role:ci
+
+    # 开发组：team-a 全权限
+    p, role:team-a-dev, applications, *, team-a/*, allow
+    p, role:team-a-dev, logs, get, team-a/*, allow
+    g, team-a-devs, role:team-a-dev
+
+    # 平台组：全部权限
+    p, role:platform-admin, *, *, */*, allow
+    g, platform-team, role:platform-admin
+
+  # 从 OIDC 的哪个 claim 取组信息
+  scopes: "[groups, email]"

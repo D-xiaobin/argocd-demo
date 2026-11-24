@@ -1,0 +1,66 @@
+# 功能点：最基础的 Application（纯 YAML，无 Kustomize/Helm）
+# 验证：UI 中显示 Synced + Healthy；改 replicas 后 selfHeal 会改回来
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: basic-app-config
+  labels:
+    app.kubernetes.io/part-of: argocd-demo
+data:
+  GREETING: "hello from argocd-demo"
+  MODE: "basic"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basic-app
+  labels:
+    app: basic-app
+    app.kubernetes.io/part-of: argocd-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: basic-app
+  template:
+    metadata:
+      labels:
+        app: basic-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: basic-app-config
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basic-app
+  labels:
+    app: basic-app
+    app.kubernetes.io/part-of: argocd-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: basic-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

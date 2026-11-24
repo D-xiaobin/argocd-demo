@@ -1,0 +1,142 @@
+# 核心 5 个 Application：纯 YAML / Kustomize 双环境 / Helm / 多源
+# 使用前把 repoURL 换成你自己的仓库（scripts/set-repo-url.sh 可批量替换）
+---
+# ① 纯 YAML + 自动同步 + 自愈 + 清理
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: basic-yaml
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/01-basic-yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-basic
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+---
+# ② Kustomize dev：自动同步
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kustomize-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/02-kustomize/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# ③ Kustomize prod：手动同步（演示「生产需要人工点确认」）
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kustomize-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/02-kustomize/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+---
+# ④ Helm：valuesObject 覆盖 + parameters 覆盖
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helm-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/03-helm
+    helm:
+      releaseName: demo-helm
+      valuesObject:
+        replicaCount: 2
+        env:
+          APP_ENV: helm-from-argocd
+          LOG_LEVEL: debug
+      parameters:
+        - name: service.port
+          value: "8080"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-helm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# ⑤ 多源：Chart 来自 Helm 仓库，values 来自本仓库（$values 引用）
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multi-source
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  sources:
+    - repoURL: https://stefanprodan.github.io/podinfo
+      chart: podinfo
+      targetRevision: 6.17.0
+      helm:
+        releaseName: podinfo-multi
+        valueFiles:
+          - $values/apps/04-multi-source/values-prod.yaml
+    - repoURL: https://github.com/D-xiaobin/argocd-demo.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-multi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,62 @@
+# 功能点：AppProject 的五种边界
+#   sourceRepos / destinations / clusterResourceWhitelist / namespaceResourceBlacklist / syncWindows / roles
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-a
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: 演示项目：只能部署 demo-* 命名空间
+
+  # ① 允许的来源仓库
+  sourceRepos:
+    - https://github.com/D-xiaobin/argocd-demo.git
+    - https://stefanprodan.github.io/podinfo
+    - https://charts.bitnami.com/bitnami
+
+  # ② 允许的目标（集群 + 命名空间，支持通配符）
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "demo-*"
+    - server: https://kubernetes.default.svc
+      namespace: "argocd"
+
+  # ③ 允许创建的集群级资源（Namespace 必须放行，否则 CreateNamespace 会失败）
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRole
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRoleBinding
+    - group: "apiextensions.k8s.io"
+      kind: CustomResourceDefinition
+
+  # ④ 禁止的命名空间级资源（防止应用自己改配额）
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+
+  # ⑤ 发布窗口：周日 02:00-04:00 禁止同步（演示用，可按需删除）
+  syncWindows:
+    - kind: deny
+      schedule: "0 2 * * 0"
+      duration: 2h
+      applications:
+        - "*"
+      manualSync: true
+
+  # ⑥ 项目级角色（配合 config/argocd-rbac-cm.yaml 使用）
+  roles:
+    - name: developer
+      description: 可以同步但不能删除应用
+      policies:
+        - p, proj:team-a:developer, applications, get, team-a/*, allow
+        - p, proj:team-a:developer, applications, sync, team-a/*, allow
+        - p, proj:team-a:developer, applications, action/*, team-a/*, allow
+      groups:
+        - team-a-devs

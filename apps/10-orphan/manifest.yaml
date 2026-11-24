@@ -1,0 +1,17 @@
+# 功能点：孤儿资源检测（orphanedResources）
+# Application 里开启了 spec.orphanedResources.warn: true
+# 验证：手动在 demo-orphan 里创建一个不在 Git 中的资源，UI 的 APP DETAILS 会出现 Orphaned resources 面板
+#   kubectl -n demo-orphan create configmap i-am-orphan --from-literal=why=manual
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-orphan
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: managed-config
+  namespace: demo-orphan
+data:
+  OWNER: "argocd"
+  NOTE: "这个资源在 Git 里，不会被标记为孤儿"

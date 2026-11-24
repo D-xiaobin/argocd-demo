@@ -1,0 +1,36 @@
+# 功能点：prod overlay —— 更高副本、更严资源限制、JSON6902 patch
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: demo-prod
+
+namePrefix: prod-
+
+resources:
+  - ../../base
+
+replicas:
+  - name: kustomize-app
+    count: 3
+
+configMapGenerator:
+  - name: kustomize-app-config
+    behavior: merge
+    literals:
+      - APP_ENV=prod
+      - LOG_LEVEL=warn
+
+patches:
+  - target:
+      kind: Deployment
+      name: kustomize-app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi
+
+commonLabels:
+  env: prod

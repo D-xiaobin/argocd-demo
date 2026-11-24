@@ -1,0 +1,36 @@
+# 功能点：Git 目录生成器 —— 每个 overlay 目录自动生成一个 Application
+# 新增 apps/02-kustomize/overlays/staging 目录后，这里会自动多出一个应用
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: as-git-dirs
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - git:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        revision: HEAD
+        directories:
+          - path: apps/02-kustomize/overlays/*
+  template:
+    metadata:
+      name: 'dirs-{{.path.basename}}'
+      labels:
+        demo: applicationset
+        env: '{{.path.basename}}'
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        targetRevision: HEAD
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'demo-{{.path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

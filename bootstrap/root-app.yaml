@@ -1,0 +1,29 @@
+# 功能点：App of Apps —— 一个 Application 管住所有 Application
+# 它递归扫描 argocd/ 目录，把里面的 AppProject 和 Application 全部创建出来
+# 用法：kubectl apply -f bootstrap/root-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: argocd
+    directory:
+      recurse: true
+      include: '{*.yaml,*.yml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

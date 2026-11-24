@@ -1,0 +1,3 @@
+name: prod
+namespace: demo-files-prod
+replicas: 3

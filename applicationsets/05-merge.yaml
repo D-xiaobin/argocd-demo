@@ -1,0 +1,51 @@
+# 功能点：Merge 生成器 —— 把「集群列表」和「每个集群的参数」按 key 合并
+# 场景：10 个集群都要装同一个组件，但 prod 集群要 3 副本、dev 只要 1 副本
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: as-merge
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - merge:
+        mergeKeys: [name]
+        generators:
+          # 来源一：所有已注册集群（提供 name / server）
+          - clusters: {}
+          # 来源二：每个集群的额外参数（按 name 合并）
+          - list:
+              elements:
+                - name: in-cluster
+                  replicas: "2"
+                  tier: demo
+  template:
+    metadata:
+      name: 'merge-{{.name}}'
+      labels:
+        demo: applicationset
+        tier: '{{.tier}}'
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        targetRevision: HEAD
+        path: apps/01-basic-yaml
+        kustomize:
+          patches:
+            - target:
+                kind: Deployment
+                name: basic-app
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: {{.replicas}}
+      destination:
+        server: '{{.server}}'
+        namespace: 'demo-merge-{{.name}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

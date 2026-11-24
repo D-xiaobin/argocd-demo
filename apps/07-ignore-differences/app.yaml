@@ -1,0 +1,57 @@
+# 功能点：ignoreDifferences —— HPA 会改 Deployment 的 replicas，不该被 Argo CD 判为 OutOfSync
+# 配套：argocd/apps/advanced.yaml 里这个 Application 配置了
+#   ignoreDifferences: /spec/replicas (Deployment)
+#   syncOptions: RespectIgnoreDifferences=true
+# 验证：HPA 扩容到 3 副本后，Application 仍显示 Synced
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-app
+  namespace: demo-ignore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hpa-app
+  template:
+    metadata:
+      labels:
+        app: hpa-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-app
+  namespace: demo-ignore
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-ignore

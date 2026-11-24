@@ -1,0 +1,86 @@
+# 功能点：sync-wave 顺序 —— Namespace(-2) → ConfigMap(-1) → Deployment(0) → Service(1) → Job(2)
+# 验证：UI 同步过程中观察资源逐个变为绿色；或 kubectl get events 看创建顺序
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-waves
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wave-config
+  namespace: demo-waves
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  ORDER: "configmap before deployment"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wave-app
+  namespace: demo-waves
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wave-app
+  template:
+    metadata:
+      labels:
+        app: wave-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          envFrom:
+            - configMapRef:
+                name: wave-config
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wave-app
+  namespace: demo-waves
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  selector:
+    app: wave-app
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wave-verify
+  namespace: demo-waves
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: verify
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "所有前置资源已就绪，Deployment:"
+              echo "wave 顺序执行完成"

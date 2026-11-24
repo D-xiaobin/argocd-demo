@@ -1,0 +1,36 @@
+# 功能点：Cluster 生成器 —— 每个注册到 Argo CD 的集群生成一个 Application
+# 默认会匹配到 in-cluster；再注册一个集群（第 8 章的 cluster Secret）就会自动多一个应用
+# 也可以加 selector 只选带特定 label 的集群：
+#   clusters:
+#     selector:
+#       matchLabels:
+#         env: prod
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: as-clusters
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - clusters: {}
+  template:
+    metadata:
+      name: 'cluster-{{.name}}'
+      labels:
+        demo: applicationset
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        targetRevision: HEAD
+        path: apps/01-basic-yaml
+      destination:
+        server: '{{.server}}'
+        namespace: 'demo-cluster-{{.name}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

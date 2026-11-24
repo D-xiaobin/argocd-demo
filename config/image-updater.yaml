@@ -1,0 +1,32 @@
+# 功能点：argocd-image-updater v1.x 的 ImageUpdater CRD
+# 前提：已安装 argocd-image-updater（>= 1.0），且 Application 的镜像字段可被写回
+# 安装：
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm install argocd-image-updater argo/argocd-image-updater -n argocd \
+#     --set config.registries[0].name=DockerHub \
+#     --set config.registries[0].api_url=https://registry-1.docker.io
+# 验证：
+#   kubectl -n argocd get imageupdater
+#   kubectl -n argocd logs deploy/argocd-image-updater | grep -i basic-yaml
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: demo-updater
+  namespace: argocd
+spec:
+  # 作用对象：按名字正则匹配 Application
+  applicationRefs:
+    - namePattern: "basic-yaml"
+      images:
+        - alias: nginx
+          imageName: "nginx"
+          # 只允许 1.27.x，避免跳到不兼容的大版本
+          commonUpdateSettings:
+            updateStrategy: semver
+            allowTags: "regexp:^1\\.27\\.[0-9]+-alpine$"
+      # 写回方式：argocd（直接改 Application）或 git（提交到仓库）
+      manifestTargets:
+        kustomize:
+          name: nginx
+  writeBackConfig:
+    method: argocd

@@ -1,0 +1,46 @@
+# 功能点：Git 文件生成器 —— 每个 YAML 文件描述一个环境，字段直接作为模板变量
+# applicationsets/params/dev.yaml、prod.yaml 就是「配置即环境」
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: as-git-files
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        revision: HEAD
+        files:
+          - path: applicationsets/params/*.yaml
+  template:
+    metadata:
+      name: 'files-{{.name}}'
+      labels:
+        demo: applicationset
+        env: '{{.name}}'
+    spec:
+      project: team-a
+      source:
+        repoURL: https://github.com/D-xiaobin/argocd-demo.git
+        targetRevision: HEAD
+        path: apps/01-basic-yaml
+        kustomize:
+          patches:
+            - target:
+                kind: Deployment
+                name: basic-app
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: {{.replicas}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: demo-app
+description: 用于测试 Argo CD Helm 渲染与参数覆盖的最小 Chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

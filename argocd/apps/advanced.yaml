@@ -1,0 +1,157 @@
+# 进阶 6 个 Application：波浪、钩子、忽略差异、同步选项、失败重试、孤儿资源
+---
+# ⑥ sync-wave：观察资源按 wave 顺序创建
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sync-waves
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/05-sync-waves
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-waves
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+# ⑦ hooks：PreSync / Sync / PostSync / SyncFail / Skip
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hooks
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/06-hooks
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-hooks
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+---
+# ⑧ ignoreDifferences：HPA 改副本数不算漂移
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ignore-differences
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/07-ignore-differences
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-ignore
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jqPathExpressions:
+        - '.spec.metrics[]?.resource.target.averageUtilization'
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+---
+# ⑨ 资源级 sync-options + Application 级 ServerSideApply / PruneLast
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sync-options
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/08-sync-options
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-options
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+      - PruneLast=true
+      - PrunePropagationPolicy=foreground
+---
+# ⑩ 失败重试：Job 故意失败 → 重试 2 次 → Degraded → SyncFail hook
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: failing-sync
+  namespace: argocd
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/09-failing-sync
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-fail
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 30s
+---
+# ⑪ 孤儿资源检测
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orphan-demo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/D-xiaobin/argocd-demo.git
+    targetRevision: HEAD
+    path: apps/10-orphan
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-orphan
+  orphanedResources:
+    warn: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

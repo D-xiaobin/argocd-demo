@@ -1,0 +1,41 @@
+# 功能点：平台项目 —— 管理 Argo CD 自身与 ApplicationSet
+# 与 team-a 的区别：可以写 argocd 命名空间，允许 AppProject / ApplicationSet 等 CRD
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: 平台团队项目：管理 Argo CD 自身配置与集群级对象
+
+  sourceRepos:
+    - https://github.com/D-xiaobin/argocd-demo.git
+    - "*"
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "argocd"
+    - server: https://kubernetes.default.svc
+      namespace: "kube-system"
+    - server: "*"
+      namespace: "*"
+
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  roles:
+    - name: admin
+      description: 平台管理员
+      policies:
+        - p, proj:platform:admin, applications, *, platform/*, allow
+        - p, proj:platform:admin, clusters, *, *, allow
+        - p, proj:platform:admin, repositories, *, *, allow
+      groups:
+        - platform-team

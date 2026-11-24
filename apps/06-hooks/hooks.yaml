@@ -1,0 +1,146 @@
+# 功能点：Argo CD 的四种 hook + Skip
+#   PreSync  —— 同步前（做备份、预检）
+#   Sync     —— 与普通资源一起执行
+#   PostSync —— 所有资源健康后执行（冒烟测试、通知）
+#   SyncFail —— 同步失败时执行（告警、回滚）
+#   Skip     —— 声明了资源但不部署（生成清单给别的系统用）
+# 验证：kubectl -n demo-hooks get jobs -w，或在 UI 的 sync 结果里看 hook 阶段
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-hooks
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hooks-app-config
+  namespace: demo-hooks
+data:
+  APP_ENV: hooks-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hooks-app
+  namespace: demo-hooks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hooks-app
+  template:
+    metadata:
+      labels:
+        app: hooks-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: presync-check
+  namespace: demo-hooks
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: check
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[PreSync] 检查集群连通性与前置条件"
+              nslookup kubernetes.default >/dev/null && echo "[PreSync] DNS OK"
+              echo "[PreSync] 通过"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sync-migrate
+  namespace: demo-hooks
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[Sync] 模拟数据库迁移 / 数据初始化"
+              sleep 3
+              echo "[Sync] 完成"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postsync-smoke
+  namespace: demo-hooks
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[PostSync] 冒烟测试：访问 hooks-app"
+              wget -q -O /dev/null http://hooks-app.demo-hooks.svc.cluster.local && echo "[PostSync] 服务可达"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: syncfail-alert
+  namespace: demo-hooks
+  annotations:
+    argocd.argoproj.io/hook: SyncFail
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: alert
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[SyncFail] 同步失败了，这里通常接告警或回滚逻辑"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skip-me
+  namespace: demo-hooks
+  annotations:
+    argocd.argoproj.io/hook: Skip
+data:
+  NOTE: "这个资源会被渲染但不会 apply，用来演示 Skip"
