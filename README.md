@@ -4,7 +4,7 @@
 
 不是「Hello World」级别的单应用示例，而是一套覆盖 20 个功能点的测试床：从最基础的 Application 到 sync-wave、五种 hook、多源、ApplicationSet 五种生成器、RBAC、通知、镜像自动更新、孤儿资源检测。
 
-配合教程使用效果最好：[Argo CD 学习手册](https://github.com/D-xiaobin/argocd-demo) 的第 3~8 章。
+配合《Argo CD 学习手册》第 3~8 章使用效果最好；每个功能点怎么验证、预期什么结果，见 [docs/feature-matrix.md](docs/feature-matrix.md)。
 
 ---
 
@@ -35,7 +35,9 @@ cd argocd-demo
 
 ### 2. 把占位地址换成你自己的仓库
 
-所有 YAML 里的 `repoURL` 都是 `https://github.com/D-xiaobin/argocd-demo.git`，必须换成你 fork 后的地址，否则 Argo CD 拉不到。
+所有 YAML 里的 `repoURL` 已经是 `https://github.com/D-xiaobin/argocd-demo.git`，**直接 apply 就能跑**，不用改。
+
+只有当你 fork 到自己账号下时才需要替换：
 
 ```bash
 chmod +x scripts/*.sh
